@@ -11,6 +11,8 @@ This repo shows how to build a simple AI CV Summary Application using Amazon Bed
 - Upload a CV in PDF file and get summary
 - Add addition questions such as please summarize in 5 lines
 
+[![screencast thumbnail](./assets/demo.png)](https://d2cvlmmg8c0xrp.cloudfront.net/demo/bedrock-summary-cv.mp4)
+
 ## Setup Project
 
 Let create a new Next.JS project
