@@ -288,3 +288,139 @@ npm run dev
 ## Deploy
 
 There is a Dockerfile and a build.py script to build a docker image. Given the docker image, you can deploy the application in may ways such as in Amazon ECS, Amazon EKS, EC2, etc.
+
+<details>
+<summary>Dockerfile</summary>
+```ts
+FROM node:18-alpine AS base
+
+# Install dependencies only when needed
+
+FROM base AS deps
+
+# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
+
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Install dependencies based on the preferred package manager
+
+COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml\* ./
+RUN \
+ if [ -f yarn.lock ]; then yarn --frozen-lockfile; \
+ elif [ -f package-lock.json ]; then npm ci; \
+ elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm i --frozen-lockfile; \
+ else echo "Lockfile not found." && exit 1; \
+ fi
+
+# Rebuild the source code only when needed
+
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Next.js collects completely anonymous telemetry data about general usage.
+
+# Learn more here: https://nextjs.org/telemetry
+
+# Uncomment the following line in case you want to disable telemetry during the build.
+
+# ENV NEXT_TELEMETRY_DISABLED 1
+
+RUN \
+ if [ -f yarn.lock ]; then yarn run build; \
+ elif [ -f package-lock.json ]; then npm run build; \
+ elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm run build; \
+ else echo "Lockfile not found." && exit 1; \
+ fi
+
+# Production image, copy all the files and run next
+
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV production
+
+# Uncomment the following line in case you want to disable telemetry during runtime.
+
+# ENV NEXT_TELEMETRY_DISABLED 1
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/public ./public
+
+# Set the correct permission for prerender cache
+
+RUN mkdir .next
+RUN chown nextjs:nodejs .next
+
+# Automatically leverage output traces to reduce image size
+
+# https://nextjs.org/docs/advanced-features/output-file-tracing
+
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT 3000
+
+# set hostname to localhost
+
+ENV HOSTNAME "0.0.0.0"
+
+# server.js is created by next build from the standalone output
+
+# https://nextjs.org/docs/pages/api-reference/next-config-js/output
+
+CMD ["node", "server.js"]
+
+```
+</details>
+```
+
+and build.py script
+
+<details>
+<summary>build.py</summary>
+
+```py
+import os
+
+# parameters
+REGION = "ap-southeast-1"
+APP_NAME = "next-bedrock-app"
+
+# get account id
+ACCOUNT = os.popen("aws sts get-caller-identity | jq -r '.Account'").read().strip()
+
+# delete all docker images
+os.system("sudo docker system prune -a")
+
+# build next-bedrock-app image
+os.system(f"sudo docker build -t {APP_NAME} . ")
+
+#  aws ecr login
+os.system(f"aws ecr get-login-password --region {REGION} | sudo docker login --username AWS --password-stdin {ACCOUNT}.dkr.ecr.{REGION}.amazonaws.com")
+
+# get image id
+IMAGE_ID=os.popen(f"sudo docker images -q {APP_NAME}:latest").read()
+
+# tag {APP_NAME} image
+os.system(f"sudo docker tag {IMAGE_ID.strip()} {ACCOUNT}.dkr.ecr.{REGION}.amazonaws.com/{APP_NAME}:latest")
+
+# create ecr repository
+os.system(f"aws ecr create-repository --registry-id {ACCOUNT} --repository-name {APP_NAME} --region {REGION}")
+
+# push image to ecr
+os.system(f"sudo docker push {ACCOUNT}.dkr.ecr.{REGION}.amazonaws.com/{APP_NAME}:latest")
+
+# run locally to test
+# os.system(f"sudo docker run -d -p 3000:3000 next-bedrock-app:latest")
+```
+
+</details>
