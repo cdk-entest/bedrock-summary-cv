@@ -296,6 +296,7 @@ There is a Dockerfile and a build.py script to build a docker image. Given the d
 
 <details>
 <summary>Dockerfile</summary>
+
 ```ts
 FROM node:18-alpine AS base
 
@@ -385,8 +386,8 @@ ENV HOSTNAME "0.0.0.0"
 CMD ["node", "server.js"]
 
 ```
+
 </details>
-```
 
 and build.py script
 
