@@ -6,7 +6,10 @@ date: 16/04/2024
 
 ## Introduction
 
-This repo shows how to build a simple AI CV Summary Application using Amazon Bedrock and Next.JS
+This repo shows how to build a simple AI CV Summary Application using Amazon Bedrock and Next.JS. Functions
+
+- Upload a CV in PDF file and get summary
+- Add addition questions such as please summarize in 5 lines
 
 ## Setup Project
 
